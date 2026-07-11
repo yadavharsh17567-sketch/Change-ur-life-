@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Scissors, Youtube, Link as LinkIcon, Sparkles, Clock, TrendingUp, CheckCircle, Upload, Loader2, AlertCircle } from 'lucide-react';
+import { Scissors, Youtube, Link as LinkIcon, Sparkles, Clock, TrendingUp, CheckCircle, Upload, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { cn } from '../../lib/utils';
 import { Clip } from '../../types/pipeline';
+import { useClipperStore } from '../../store/clipperStore';
 
 
 export function AutoClipper() {
   const [url, setUrl] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [step, setStep] = useState<string>('');
-  const [clips, setClips] = useState<Clip[]>([]);
-  const [videoInfo, setVideoInfo] = useState<{ title: string; id: string } | null>(null);
+  
+  const { clips, videoInfo, setClips, setVideoInfo, clearClips } = useClipperStore();
+  
   const [uploadingClips, setUploadingClips] = useState<{ [key: number]: boolean | string }>({});
   const [uploadedClips, setUploadedClips] = useState<{ [key: number]: boolean }>({});
   const [ytStatus, setYtStatus] = useState<{connected: boolean} | null>(null);
@@ -23,6 +25,7 @@ export function AutoClipper() {
   } | null>(null);
 
   useEffect(() => {
+    console.log('[AutoClipper] Component mounted. Current clips count:', clips.length);
     fetch('/api/youtube/status')
       .then(res => res.json())
       .then(data => setYtStatus(data))
@@ -33,8 +36,7 @@ export function AutoClipper() {
     if (!url) return;
     
     setIsProcessing(true);
-    setClips([]);
-    setVideoInfo(null);
+    clearClips(); // Using store clear
     setUploadedClips({});
     setApiError(null);
     
@@ -75,6 +77,7 @@ export function AutoClipper() {
       setTimeout(() => {
         setStep('Extracting viral moments...');
         setTimeout(() => {
+          console.log('[AutoClipper] Clips generated:', data.clips.length);
           setVideoInfo(data.originalVideo);
           setClips(data.clips);
           setIsProcessing(false);
@@ -94,6 +97,12 @@ export function AutoClipper() {
         });
       }
     }
+  };
+
+  const handleClearClips = () => {
+    console.log('[AutoClipper] User explicitly cleared clips.');
+    clearClips();
+    setUploadedClips({});
   };
 
   const handleUploadClip = async (index: number, clip: Clip) => {
@@ -339,6 +348,15 @@ export function AutoClipper() {
               </div>
               Neural Output Hash
             </h3>
+            
+            <Button 
+              variant="outline" 
+              onClick={handleClearClips}
+              className="h-10 px-6 border-white/10 hover:bg-rose-500/10 hover:border-rose-500/20 hover:text-rose-400 text-[9px] font-black uppercase tracking-[0.15em] rounded-xl flex items-center gap-2"
+            >
+              <Trash2 className="w-3 h-3" />
+              Clear Clips
+            </Button>
             {videoInfo && (
               <div className="flex items-center gap-4 px-6 py-3 bg-white/5 rounded-2xl border border-white/5">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />

@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import { promisify } from 'util';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
@@ -1359,7 +1360,7 @@ async function startServer() {
     }
     
     const tempPath = path.join(uploadDir, `clip-${taskId}.mp4`);
-    const audioPath = path.join(uploadDir, `audio-${taskId}.mp3`);
+    const audioPath = path.join(uploadDir, `audio-${taskId}.wav`);
     const subsPath = path.join(uploadDir, `subs-${taskId}.ass`);
     const videoWithSubsPath = path.join(uploadDir, `final-${taskId}.mp4`);
     const rawPath = path.join(uploadDir, `raw-${taskId}.mp4`);
@@ -1451,9 +1452,17 @@ async function startServer() {
       
       const escapeFilterPath = (p: string) => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "'\\''");
 
+      // Helper to wrap title
+      const wrapTitle = (title: string) => {
+        const words = title.split(' ');
+        const mid = Math.floor(words.length / 2);
+        if (words.length <= 4) return title;
+        return words.slice(0, mid).join(' ') + '\n' + words.slice(mid).join(' ');
+      };
+      
       // Write textfiles for drawtext to fully prevent all escape and parameter injection issues
       fs.writeFileSync(channelNamePath, channelName, 'utf8');
-      fs.writeFileSync(clipTitlePath, clip.title, 'utf8');
+      fs.writeFileSync(clipTitlePath, wrapTitle(clip.title), 'utf8');
 
       // Download and trim using yt-dlp first, fallback to ffmpeg + ytdl stream
       currentStage = 'Download';
@@ -1480,7 +1489,9 @@ async function startServer() {
 
         await new Promise((resolve, reject) => {
           const proc = ffmpeg(rawPath)
-            .videoFilters(`crop=ih*(9/16):ih,scale=1080:1920,drawtext=textfile='${escapeFilterPath(channelNamePath)}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=48:fontcolor=white@0.3,drawtext=textfile='${escapeFilterPath(clipTitlePath)}':x=(w-text_w)/2:y=h-(h/4):fontsize=64:fontcolor=yellow:borderw=4:bordercolor=black`)
+            .videoFilters(`crop=ih*(9/16):ih,scale=1080:1920,drawtext=textfile='${escapeFilterPath(clipTitlePath)}':x=(w-text_w)/2:y=100:fontsize=72:fontcolor=yellow:borderw=4:bordercolor=black:box=1:boxcolor=black@0.8:boxborderw=20`)
+            .videoCodec('libx264')
+            .outputOptions(['-crf 18', '-preset slow'])
             .output(tempPath)
             .on('start', (commandLine) => {
               ffmpegCommand = commandLine;
@@ -1519,16 +1530,31 @@ async function startServer() {
         }
         
         try {
-          const stream = ytdl(videoUrl, ytdlOptions);
+          let directUrl: string | null = null;
+          try {
+            console.log(`[DOWNLOAD] Fetching video formats with ytdl.getInfo for seekable streaming fallback...`);
+            const info = await ytdl.getInfo(videoUrl, ytdlOptions);
+            const format = ytdl.chooseFormat(info.formats, { filter: 'audioandvideo', quality: 'highest' });
+            directUrl = format?.url || null;
+            if (directUrl) {
+              console.log(`[DOWNLOAD] Successfully resolved direct stream URL: ${directUrl.substring(0, 100)}...`);
+            }
+          } catch (infoErr: any) {
+            console.warn(`[DOWNLOAD] Failed to get direct stream URL, using non-seekable fallback stream:`, infoErr.message || infoErr);
+          }
+
+          const inputSource = directUrl || ytdl(videoUrl, ytdlOptions);
           let ffmpegCommand = '';
           let ffmpegStderr = '';
           let ffmpegStdout = '';
 
           await new Promise((resolve, reject) => {
-            const proc = ffmpeg(stream)
+            const proc = ffmpeg(inputSource)
               .setStartTime(startSec)
               .duration(duration)
-              .videoFilters(`crop=ih*(9/16):ih,scale=1080:1920,drawtext=textfile='${escapeFilterPath(channelNamePath)}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=48:fontcolor=white@0.3,drawtext=textfile='${escapeFilterPath(clipTitlePath)}':x=(w-text_w)/2:y=h-(h/4):fontsize=64:fontcolor=yellow:borderw=4:bordercolor=black`)
+              .videoFilters(`crop=ih*(9/16):ih,scale=1080:1920,drawtext=textfile='${escapeFilterPath(clipTitlePath)}':x=(w-text_w)/2:y=100:fontsize=72:fontcolor=yellow:borderw=4:bordercolor=black:box=1:boxcolor=black@0.8:boxborderw=20`)
+              .videoCodec('libx264')
+              .outputOptions(['-crf 18', '-preset slow'])
               .output(tempPath)
               .on('start', (commandLine) => {
                 ffmpegCommand = commandLine;
@@ -1584,7 +1610,12 @@ async function startServer() {
         await new Promise((resolve, reject) => {
           const proc = ffmpeg(tempPath)
             .noVideo()
-            .audioCodec('libmp3lame')
+            .outputOptions([
+              '-map 0:a:0',       // Extract only the primary speech/audio track
+              '-ar 16000',        // 16kHz sample rate
+              '-ac 1',            // mono
+              '-c:a pcm_s16le'    // PCM 16-bit codec
+            ])
             .output(audioPath)
             .on('start', (commandLine) => {
               ffmpegCommand = commandLine;
@@ -1614,6 +1645,56 @@ async function startServer() {
 
           proc.run();
         });
+
+        // Save a clean copy as debug_audio.wav
+        const debugAudioPath = path.join(uploadDir, 'debug_audio.wav');
+        try {
+          fs.copyFileSync(audioPath, debugAudioPath);
+          console.log(`[DEBUG] [${taskId}] Extracted audio copied to debug_audio.wav at: ${debugAudioPath}`);
+        } catch (copyErr: any) {
+          console.error(`[DEBUG] [${taskId}] Failed to save copy as debug_audio.wav:`, copyErr.message || copyErr);
+        }
+
+        const stat = fs.statSync(audioPath);
+        let duration = 0;
+        let codec = 'pcm_s16le';
+        let sampleRate = 16000;
+        let channels = 1;
+
+        try {
+          const ffprobe = promisify(ffmpeg.ffprobe);
+          const metadata = await ffprobe(audioPath);
+          duration = parseFloat(metadata.format.duration || '0');
+          if (metadata.streams && metadata.streams[0]) {
+            codec = metadata.streams[0].codec_name || codec;
+            sampleRate = parseInt(metadata.streams[0].sample_rate || '0', 10) || sampleRate;
+            channels = parseInt(metadata.streams[0].channels || '0', 10) || channels;
+          }
+        } catch (probeErr: any) {
+          console.error(`[DEBUG] [${taskId}] FFprobe on extracted audio failed:`, probeErr.message || probeErr);
+        }
+
+        console.log(`[DEBUG] [${taskId}] Extracted Audio Analysis:`);
+        console.log(`- File Path: ${audioPath}`);
+        console.log(`- File Size: ${stat.size} bytes`);
+        console.log(`- Duration: ${duration} seconds`);
+        console.log(`- Codec: ${codec}`);
+        console.log(`- Sample Rate: ${sampleRate} Hz`);
+        console.log(`- Channels: ${channels}`);
+
+        // Verify the file is not empty and has a duration
+        if (stat.size === 0) {
+          const emptyErr = new Error(`Extracted audio file is empty (0 bytes).`);
+          updateTaskStep(taskId, 'extract-audio', 'failed', 0, emptyErr.message);
+          throw emptyErr;
+        }
+        if (duration <= 0) {
+          const emptyDurErr = new Error(`Extracted audio file has duration of 0 seconds.`);
+          updateTaskStep(taskId, 'extract-audio', 'failed', 0, emptyDurErr.message);
+          throw emptyDurErr;
+        }
+
+        console.log(`[DEBUG] [${taskId}] Verification successful: audio file contains active, non-empty speech/audio track.`);
         updateTaskStep(taskId, 'extract-audio', 'completed', 100, 'Audio extracted successfully.');
 
         suggestedSolution = `Could not transcribe the audio using provider '${customConfig.AI_PROVIDER}'. Please verify your API Key and billing/quota status in Settings.`;
@@ -1624,20 +1705,91 @@ async function startServer() {
         const provider = customConfig.AI_PROVIDER || 'groq';
 
         console.log(`[EXPORT] [${taskId}] Transcribing audio with provider: ${provider}...`);
+        
         if (provider === 'groq' && customConfig.GROQ_API_KEY) {
           const formData = new FormData();
           formData.append('file', fs.createReadStream(audioPath));
           formData.append('model', 'whisper-large-v3');
           formData.append('response_format', 'verbose_json');
+          formData.append('timestamp_granularities[]', 'word'); // MUST request word-level timestamps!
           if (lang !== 'auto') formData.append('language', lang);
+          
+          console.log(`[DEBUG] [${taskId}] --- EXACT GROQ REQUEST ---`);
+          console.log(`- Endpoint: POST https://api.groq.com/openai/v1/audio/transcriptions`);
+          console.log(`- Headers:`);
+          console.log(`    Authorization: Bearer ${customConfig.GROQ_API_KEY ? customConfig.GROQ_API_KEY.substring(0, 8) + '...' : 'MISSING'}`);
+          console.log(`    Content-Type: multipart/form-data; boundary=${formData.getBoundary()}`);
+          console.log(`- Request Parameters:`);
+          console.log(`    model: "whisper-large-v3"`);
+          console.log(`    response_format: "verbose_json"`);
+          console.log(`    timestamp_granularities[]: "word"`);
+          if (lang !== 'auto') console.log(`    language: "${lang}"`);
+          console.log(`- File Uploading: ${audioPath}`);
+          console.log(`    Size: ${stat.size} bytes`);
+          console.log(`---------------------------------`);
 
-          const res = await axios.post('https://api.groq.com/openai/v1/audio/transcriptions', formData, {
-            headers: {
-              'Authorization': `Bearer ${customConfig.GROQ_API_KEY}`,
-              ...formData.getHeaders(),
+          try {
+            const res = await axios.post('https://api.groq.com/openai/v1/audio/transcriptions', formData, {
+              headers: {
+                'Authorization': `Bearer ${customConfig.GROQ_API_KEY}`,
+                ...formData.getHeaders(),
+              }
+            });
+            console.log(`[DEBUG] [${taskId}] --- COMPLETE GROQ API RESPONSE ---`);
+            console.log(JSON.stringify(res.data, null, 2));
+            console.log(`------------------------------------------------`);
+
+            const transcriptionText = res.data?.text || '';
+            const detectedLanguage = res.data?.language || 'unknown';
+            const segments = res.data?.segments || [];
+            const noSpeechProb = segments.length > 0 ? (segments[0].no_speech_prob ?? 'N/A') : 'N/A';
+
+            console.log(`[DEBUG] [${taskId}] --- TRANSCRIPTION METRICS ---`);
+            console.log(`- transcription.text: "${transcriptionText}"`);
+            console.log(`- detected language: ${detectedLanguage}`);
+            console.log(`- no_speech_prob: ${noSpeechProb}`);
+            console.log(`- segments count: ${segments.length}`);
+            console.log(`-----------------------------------`);
+
+            if (!transcriptionText || transcriptionText.trim().length === 0) {
+              const emptyErr = `Groq Whisper returned empty transcription text. Raw response: ${JSON.stringify(res.data)}`;
+              console.error(`[DEBUG] [${taskId}] ${emptyErr}`);
+              updateTaskStep(taskId, 'transcribe', 'failed', 0, 'Transcription text was empty.');
+              throw new Error(emptyErr);
             }
-          });
-          words = res.data?.words;
+
+            words = res.data?.words;
+            
+            if ((!words || words.length === 0) && res.data?.segments) {
+              console.log(`[DEBUG] [${taskId}] No direct 'words' array returned. Extracting or falling back to segment timestamps.`);
+              const hasSegmentWords = res.data.segments.some((s: any) => s.words && s.words.length > 0);
+              if (hasSegmentWords) {
+                words = res.data.segments.flatMap((s: any) => s.words || []);
+              } else {
+                words = res.data.segments.map((s: any) => ({
+                  start: s.start,
+                  end: s.end,
+                  word: s.text.trim()
+                })).filter((w: any) => w.word.length > 0);
+              }
+            }
+
+            if (!words || words.length === 0) {
+              const emptyWordsErr = `No subtitles or segments could be mapped from the Groq API response.`;
+              console.error(`[DEBUG] [${taskId}] ${emptyWordsErr}`);
+              updateTaskStep(taskId, 'transcribe', 'failed', 0, emptyWordsErr);
+              throw new Error(emptyWordsErr);
+            }
+          } catch (err: any) {
+            console.error(`[DEBUG] [${taskId}] Groq API Error: ${err.message}`);
+            if (err.response) {
+              console.error(`[DEBUG] [${taskId}] Groq response error details:`, JSON.stringify(err.response.data, null, 2));
+              updateTaskStep(taskId, 'transcribe', 'failed', 0, `Groq API Error: ${JSON.stringify(err.response.data)}`);
+            } else {
+              updateTaskStep(taskId, 'transcribe', 'failed', 0, `Groq Request Failed: ${err.message}`);
+            }
+            throw err;
+          }
         } else if (provider === 'openai' && customConfig.OPENAI_API_KEY) {
           const formData = new FormData();
           formData.append('file', fs.createReadStream(audioPath));
@@ -1661,7 +1813,7 @@ async function startServer() {
           const res = await axios.post(url, fileBuffer, {
             headers: {
               'Authorization': `Token ${customConfig.DEEPGRAM_API_KEY}`,
-              'Content-Type': 'audio/mp3',
+              'Content-Type': 'audio/wav',
             }
           });
           
@@ -1721,7 +1873,7 @@ async function startServer() {
           console.warn(`[EXPORT] [${taskId}] Missing or invalid API key for subtitle provider: ${provider}`);
         }
 
-        if (words) {
+        if (words && words.length > 0) {
           console.log(`[EXPORT] [${taskId}] Subtitles transcribed with ${words.length} words. Rendering captions...`);
           currentStage = 'FFmpeg';
           suggestedSolution = 'Could not burn dynamic subtitles into video. Check that your caption styling is supported by FFmpeg.';
@@ -1735,18 +1887,47 @@ async function startServer() {
           
           generateASSSubtitles(words, subsPath, style, useEmoji);
 
+          // 1. Save and print its full path and file size
+          console.log(`[DEBUG] [${taskId}] Subtitle file saved at: ${subsPath}`);
+          const subsStat = fs.statSync(subsPath);
+          console.log(`[DEBUG] [${taskId}] Subtitle file size: ${subsStat.size} bytes`);
+          
+          // 4. Verify the subtitle file is not empty
+          if (subsStat.size === 0) {
+            const errEmptySubs = new Error(`Generated subtitle file is empty!`);
+            updateTaskStep(taskId, 'subtitles', 'failed', 0, errEmptySubs.message);
+            throw errEmptySubs;
+          }
+
+          // 3. Print the first 10 subtitle entries/lines
+          const subsContent = fs.readFileSync(subsPath, 'utf8');
+          const subsLines = subsContent.split('\n');
+          console.log(`[DEBUG] [${taskId}] First 10 subtitle entries/lines:`);
+          subsLines.slice(0, 15).forEach((line, idx) => {
+            console.log(`  [Line ${idx + 1}] ${line}`);
+          });
+
           // Burn subtitles into video
           let ffmpegCommand = '';
           let ffmpegStderr = '';
           let ffmpegStdout = '';
 
+          console.log(`[DEBUG] [${taskId}] Rendering video with subtitles.`);
+          console.log(`[DEBUG] [${taskId}] Input video: ${tempPath}`);
+          console.log(`[DEBUG] [${taskId}] Subtitle file: ${subsPath}`);
+          console.log(`[DEBUG] [${taskId}] Output video: ${videoWithSubsPath}`);
+          
+          if (!fs.existsSync(tempPath)) console.error(`[DEBUG] [${taskId}] Input video does not exist!`);
+          
           await new Promise((resolve, reject) => {
             const proc = ffmpeg(tempPath)
-              .videoFilters(`ass='${escapeFilterPath(subsPath)}'`)
-              .outputOptions(['-c:a copy']) // copy audio without re-encoding
+              .videoFilters(`ass='${escapeFilterPath(subsPath)}',drawtext=textfile='${escapeFilterPath(channelNamePath)}':x=w-text_w-20:y=h-text_h-20:fontsize=30:fontcolor=white:alpha=0.3`)
+              .videoCodec('libx264')
+              .outputOptions(['-c:a copy', '-crf 18', '-preset slow'])
               .output(videoWithSubsPath)
               .on('start', (commandLine) => {
                 ffmpegCommand = commandLine;
+                // 5. Log the exact FFmpeg command used to burn subtitles
                 console.log(`[FFMPEG RUN] Spawned FFmpeg subtitles with command: ${commandLine}`);
               })
               .on('stdout', (data) => {
@@ -1762,26 +1943,60 @@ async function startServer() {
                  updateTaskStep(taskId, 'subtitles', 'completed', 100, 'Captions rendered into video.');
                  console.log(`[FFMPEG STDOUT]:\n${ffmpegStdout}`);
                  console.log(`[FFMPEG STDERR]:\n${ffmpegStderr}`);
-                 resolve(null);
+                 
+                 // 6. Verify FFmpeg successfully creates the rendered video
+                 if (fs.existsSync(videoWithSubsPath)) {
+                   const renderedSize = fs.statSync(videoWithSubsPath).size;
+                   console.log(`[DEBUG] [${taskId}] Rendered video created successfully. Path: ${videoWithSubsPath}, Size: ${renderedSize} bytes.`);
+                   if (renderedSize === 0) {
+                     reject(new Error("FFmpeg completed but the output rendered video is 0 bytes."));
+                   } else {
+                     resolve(null);
+                   }
+                 } else {
+                   reject(new Error("FFmpeg completed but the output rendered video was not created."));
+                 }
               })
               .on('error', (err) => {
                  console.error(`[EXPORT] [${taskId}] FFmpeg subtitles burn error:`, err);
                  console.error(`[FFMPEG COMMAND]: ${ffmpegCommand}`);
                  console.error(`[FFMPEG STDERR]:\n${ffmpegStderr}`);
+                 const realErrorMsg = `FFmpeg subtitle burn failed. Error: ${err.message}. Stderr: ${ffmpegStderr}`;
+                 // 9. Stop the pipeline and display the real FFmpeg error instead of marking the step completed
+                 updateTaskStep(taskId, 'subtitles', 'failed', 0, realErrorMsg);
                  (err as any).ffmpegCommand = ffmpegCommand;
                  (err as any).ffmpegStderr = ffmpegStderr;
                  (err as any).ffmpegStdout = ffmpegStdout;
-                 reject(err);
+                 reject(new Error(realErrorMsg));
               });
 
             proc.run();
           });
 
+          // Extra validation to ensure output is not empty or missing
+          if (!fs.existsSync(videoWithSubsPath) || fs.statSync(videoWithSubsPath).size === 0) {
+            const renderErr = new Error(`Rendered video file is empty or missing after subtitle embedding!`);
+            updateTaskStep(taskId, 'subtitles', 'failed', 0, renderErr.message);
+            throw renderErr;
+          }
+
+          // 7. Compare the original video path and the rendered video path
+          // 10. Add logging showing: Input video, Subtitle file, Output rendered video, Uploaded video path
+          console.log(`[DEBUG] [${taskId}] --- SUBTITLE EMBEDDING VERIFICATION ---`);
+          console.log(`- Input video: ${tempPath} (${fs.statSync(tempPath).size} bytes)`);
+          console.log(`- Subtitle file: ${subsPath} (${subsStat.size} bytes)`);
+          console.log(`- Output rendered video: ${videoWithSubsPath} (${fs.statSync(videoWithSubsPath).size} bytes)`);
+          console.log(`- Uploaded video path: ${videoWithSubsPath}`);
+          console.log(`-----------------------------------------------`);
+
+          // 8. Ensure YouTube uploads the rendered video with subtitles, not the original cropped video
           uploadVideoPath = videoWithSubsPath;
+          console.log(`[DEBUG] [${taskId}] Final video path for upload: ${uploadVideoPath}`);
         } else {
-          console.warn(`[EXPORT] [${taskId}] AI Subtitles enabled but no words transcribed.`);
-          updateTaskStep(taskId, 'transcribe', 'failed', 0, 'No words transcribed, skipping subtitles.');
-          updateTaskStep(taskId, 'subtitles', 'completed', 100, 'Skipped subtitles (no text).');
+          const emptyWordsErr = new Error(`AI Subtitles enabled but no words transcribed. Aborting pipeline.`);
+          console.error(`[EXPORT] [${taskId}] ${emptyWordsErr.message}`);
+          updateTaskStep(taskId, 'transcribe', 'failed', 0, emptyWordsErr.message);
+          throw emptyWordsErr;
         }
       }
 
@@ -1791,7 +2006,8 @@ async function startServer() {
       suggestedSolution = 'YouTube upload failed. Make sure your YouTube channel connection is valid and you have not exceeded your daily upload limits.';
       
       updateTaskStep(taskId, 'upload', 'processing', 10, 'Initializing YouTube upload...');
-      const response = await youtube.videos.insert({
+      
+      const uploadPayload = {
         part: ['snippet', 'status'],
         requestBody: {
           snippet: {
@@ -1800,16 +2016,24 @@ async function startServer() {
             tags: clip.tags,
           },
           status: {
-            privacyStatus: 'private', // Upload as private initially
+            privacyStatus: 'public', // Updated to public
           },
         },
         media: {
           body: fs.createReadStream(uploadVideoPath),
         },
-      });
+      };
+      
+      console.log(`[EXPORT] [${taskId}] YouTube API Request Payload:`, JSON.stringify(uploadPayload, null, 2));
 
-      console.log(`[EXPORT] [${taskId}] YouTube upload completed successfully. Video ID: ${response.data.id}`);
-      updateTaskStep(taskId, 'upload', 'completed', 100, `Video published to YouTube (ID: ${response.data.id}).`);
+      const response = await youtube.videos.insert(uploadPayload as any);
+
+      console.log(`[EXPORT] [${taskId}] YouTube upload completed successfully. Video ID: ${response.data.id}, Privacy Status: ${response.data.status?.privacyStatus}`);
+      if (response.data.status?.privacyStatus !== 'public') {
+         console.warn(`[EXPORT] [${taskId}] WARNING: Video uploaded but privacy status is not public: ${response.data.status?.privacyStatus}`);
+      }
+
+      updateTaskStep(taskId, 'upload', 'completed', 100, `Video published to YouTube (ID: ${response.data.id}, Privacy: ${response.data.status?.privacyStatus}).`);
       pipelineStats.currentlyProcessing = Math.max(0, pipelineStats.currentlyProcessing - 1);
       
       res.json({ success: true, videoId: response.data.id });

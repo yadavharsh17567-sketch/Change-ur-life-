@@ -19,15 +19,15 @@ const stylesConfig: Record<string, SubtitleStyle> = {
   mrbeast: {
     name: 'MrBeast',
     font: 'Arial Black',
-    fontSize: 90,
+    fontSize: 125,
     primaryColor: '&H00FFFFFF', // White
     outlineColor: '&H00000000', // Black
     backColor: '&H80000000', // Semi-transparent black
-    outline: 8,
-    shadow: 5,
-    alignment: 2,
-    marginV: 250,
-    animationTagStart: '{\\t(0,100,\\fscx120\\fscy120)\\t(100,200,\\fscx100\\fscy100)}',
+    outline: 10,
+    shadow: 2,
+    alignment: 8, // Top Center
+    marginV: 750, // ~40% from top
+    animationTagStart: '{\\fad(200,200)}',
     animationTagEnd: ''
   },
   hormozi: {
@@ -143,7 +143,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${styleObj.font},${styleObj.fontSize},${styleObj.primaryColor},&H000000FF,${styleObj.outlineColor},${styleObj.backColor},-1,0,0,0,100,100,0,0,1,${styleObj.outline},${styleObj.shadow},${styleObj.alignment},20,20,${styleObj.marginV},1
+Style: Default,${styleObj.font},${Math.round(styleObj.fontSize * 1.2)},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,0,2,50,50,200,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
