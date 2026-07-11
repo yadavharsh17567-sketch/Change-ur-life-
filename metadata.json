@@ -1,0 +1,8 @@
+{
+  "name": "Change Your Life",
+  "description": "A premium AI SaaS dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
