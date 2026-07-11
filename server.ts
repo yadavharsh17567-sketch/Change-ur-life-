@@ -63,7 +63,9 @@ class LocalCollection {
   }
 
   static writeAll(data: any) {
-    fs.writeFileSync('local_db.json', JSON.stringify(data, null, 2), 'utf8');
+    const tempPath = 'local_db.json.tmp';
+    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8');
+    fs.renameSync(tempPath, 'local_db.json');
   }
 
   orderBy(field: string, direction: 'asc' | 'desc' = 'asc') {
@@ -577,7 +579,9 @@ const loadYtAccounts = () => {
 
 const saveYtAccounts = () => {
   try {
-    fs.writeFileSync(YT_ACCOUNTS_FILE, JSON.stringify(ytAccountState, null, 2));
+    const tempPath = 'youtube_accounts.json.tmp';
+    fs.writeFileSync(tempPath, JSON.stringify(ytAccountState, null, 2));
+    fs.renameSync(tempPath, YT_ACCOUNTS_FILE);
   } catch (e) {
     console.error('Failed to save YouTube accounts:', e);
   }
