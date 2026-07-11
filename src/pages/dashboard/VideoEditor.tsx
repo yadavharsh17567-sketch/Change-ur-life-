@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Play, Pause, SkipBack, SkipForward, Type, Image as ImageIcon, 
@@ -9,6 +10,12 @@ import { Button } from '../../components/ui/Button';
 import { cn } from '../../lib/utils';
 
 export function VideoEditor() {
+  const { id } = useParams();
+  const [project, setProject] = useState<any>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  
   const [activeTab, setActiveTab] = useState<'subtitles' | 'branding' | 'watermark' | 'seo'>('subtitles');
   const [isPlaying, setIsPlaying] = useState(false);
   
@@ -30,6 +37,39 @@ export function VideoEditor() {
       .then(data => setYtStatus(data))
       .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (id) {
+      fetch(`/api/projects/${id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.error) setProject(data);
+        })
+        .catch(console.error);
+    }
+  }, [id]);
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) videoRef.current.pause();
+      else videoRef.current.play();
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
+  };
+  
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) setDuration(videoRef.current.duration);
+  };
+
+  const formatTime = (time: number) => {
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}.00`;
+  };
 
   const handleGenerateSeo = async () => {
     setIsGeneratingSeo(true);
@@ -93,7 +133,7 @@ export function VideoEditor() {
             <Video className="w-6 h-6 text-indigo-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-white tracking-tighter">Untitled_Project_01</h1>
+            <h1 className="text-2xl font-black text-white tracking-tighter truncate max-w-[200px] sm:max-w-xs">{project?.title || 'Untitled_Project_01'}</h1>
             <p className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mt-1">Status: Production Mode</p>
           </div>
         </div>
@@ -158,15 +198,26 @@ export function VideoEditor() {
       <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-visible lg:overflow-hidden">
         
         {/* Main Editor Area */}
-        <div className="flex-1 flex flex-col gap-6 min-h-[500px] lg:min-h-0 lg:overflow-hidden">
+        <div className="flex-1 flex flex-col gap-6 min-h-0 lg:overflow-hidden">
           {/* Video Player */}
-          <div className="flex-1 min-h-[250px] bg-neutral-900/40 backdrop-blur-2xl rounded-[2.5rem] border border-white/5 overflow-hidden flex flex-col relative group shadow-2xl">
-            <div className="flex-1 flex items-center justify-center bg-black relative">
-              <Video className="w-20 h-20 text-neutral-900" />
+          <div className="aspect-video min-h-[200px] lg:h-auto lg:flex-1 bg-neutral-900/40 backdrop-blur-2xl rounded-[2.5rem] border border-white/5 overflow-hidden flex flex-col relative group shadow-2xl">
+            <div className="flex-1 flex items-center justify-center bg-black relative overflow-hidden">
+              {project?.fileUrl ? (
+                <video 
+                  ref={videoRef}
+                  src={project.fileUrl} 
+                  className="w-full h-full object-contain"
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onClick={togglePlay}
+                />
+              ) : (
+                <Video className="w-20 h-20 text-neutral-900" />
+              )}
               
               {/* Simulated Subtitles */}
               {activeTab === 'subtitles' && (
-                <div className="absolute bottom-16 inset-x-0 flex justify-center">
+                <div className="absolute bottom-16 inset-x-0 flex justify-center pointer-events-none">
                   <span className="bg-black/60 backdrop-blur-xl text-white px-6 py-3 rounded-2xl text-xl font-black tracking-tight border border-white/10 shadow-2xl [text-shadow:_-2px_-2px_0_#000,_2px_-2px_0_#000,_-2px_2px_0_#000,_2px_2px_0_#000]">
                     INITIALIZING NEURAL BROADCAST...
                   </span>
@@ -175,17 +226,32 @@ export function VideoEditor() {
             </div>
             
             {/* Player Controls */}
-            <div className="h-20 bg-neutral-950/60 backdrop-blur-2xl border-t border-white/5 flex items-center px-8 gap-8">
-              <Button variant="ghost" size="icon" onClick={() => setIsPlaying(!isPlaying)} className="w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 transition-all text-white">
+            <div className="h-20 bg-neutral-950/60 backdrop-blur-2xl border-t border-white/5 flex items-center px-4 sm:px-8 gap-4 sm:gap-8">
+              <Button variant="ghost" size="icon" onClick={togglePlay} className="w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 transition-all text-white shrink-0">
                 {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
               </Button>
-              <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden relative cursor-pointer group/seek">
-                <div className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
-                <div className="absolute top-1/2 left-1/3 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white opacity-0 group-hover/seek:opacity-100 transition-opacity shadow-lg" />
+              <div 
+                className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden relative cursor-pointer group/seek"
+                onClick={(e) => {
+                  if (videoRef.current && duration) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const percent = (e.clientX - rect.left) / rect.width;
+                    videoRef.current.currentTime = percent * duration;
+                  }
+                }}
+              >
+                <div 
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full shadow-[0_0_15px_rgba(99,102,241,0.5)]" 
+                  style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                />
+                <div 
+                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white opacity-0 group-hover/seek:opacity-100 transition-opacity shadow-lg" 
+                  style={{ left: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                />
               </div>
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-black font-mono text-white tracking-widest">00:45.02</span>
-                <span className="text-[10px] font-bold font-mono text-neutral-600 uppercase tracking-widest">/ 02:15.00</span>
+              <div className="flex flex-col items-end shrink-0 w-24">
+                <span className="text-xs font-black font-mono text-white tracking-widest">{formatTime(currentTime)}</span>
+                <span className="text-[10px] font-bold font-mono text-neutral-600 uppercase tracking-widest">/ {formatTime(duration)}</span>
               </div>
             </div>
           </div>

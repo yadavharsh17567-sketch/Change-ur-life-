@@ -36,6 +36,12 @@ export function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-4 w-full sm:w-auto">
+          <Link to="/app/automation" className="flex-1 sm:flex-none">
+            <Button variant="outline" className="w-full gap-2 border-white/10 hover:bg-white/5 group">
+              <Clock className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              Reschedule
+            </Button>
+          </Link>
           <Link to="/app/clipper" className="flex-1 sm:flex-none">
             <Button className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-500/20 group">
               <Youtube className="w-4 h-4 group-hover:scale-110 transition-transform" />

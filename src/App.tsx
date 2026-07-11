@@ -33,6 +33,7 @@ export default function App() {
           <Route path="pipeline" element={<Pipeline />} />
           <Route path="youtube-accounts" element={<YouTubeAccounts />} />
           <Route path="editor" element={<VideoEditor />} />
+          <Route path="editor/:id" element={<VideoEditor />} />
           <Route path="clipper" element={<AutoClipper />} />
           <Route path="projects" element={<Projects />} />
           <Route path="uploads" element={<Uploads />} />

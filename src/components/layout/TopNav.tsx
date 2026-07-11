@@ -115,9 +115,7 @@ export function TopNav({ onMenuClick }: TopNavProps) {
           <Menu className="w-5 h-5" />
         </Button>
         <Link to="/app" className="hidden md:flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-indigo-600">
-            <span className="text-white font-black text-xs">AI</span>
-          </div>
+          <img src="/logo.png" alt="CUL Logo" className="w-14 h-14 object-contain" />
         </Link>
         <div className="relative w-full max-w-md hidden lg:block group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 group-focus-within:text-indigo-400 transition-colors" />
@@ -165,7 +163,7 @@ export function TopNav({ onMenuClick }: TopNavProps) {
           )}
 
           {showChannelMenu && (
-            <div className="absolute right-0 mt-3 w-80 bg-neutral-950/90 backdrop-blur-2xl border border-white/10 rounded-[1.75rem] shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
+            <div className="fixed inset-x-4 top-20 sm:absolute sm:inset-x-auto sm:top-full sm:right-0 sm:mt-3 sm:w-80 bg-neutral-950/90 backdrop-blur-2xl border border-white/10 rounded-[1.75rem] shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
               <div className="p-5 border-b border-white/5 bg-white/5">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Active Broadcasting Node</p>

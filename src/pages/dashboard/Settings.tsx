@@ -219,7 +219,7 @@ export function Settings() {
                 value={automationGeminiApiKey}
                 onChange={(e) => setAutomationGeminiApiKey(e.target.value)}
                 className="w-full h-14 bg-neutral-950/50 border border-indigo-500/10 rounded-2xl px-6 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm"
-                placeholder="Paste separate Gemini Token for AutoMatrix..."
+                placeholder="Paste separate Gemini Token for CUL..."
               />
             </div>
             <div>

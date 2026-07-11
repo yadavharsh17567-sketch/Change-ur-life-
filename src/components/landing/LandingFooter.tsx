@@ -15,9 +15,7 @@ export function LandingFooter() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-12 mb-20">
           <div className="col-span-2 space-y-6">
             <div className="flex items-center gap-3 font-bold text-2xl tracking-tighter text-white">
-              <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-indigo-600 shadow-xl shadow-indigo-500/20">
-                <span className="text-white font-black text-lg">AI</span>
-              </div>
+              <img src="/logo.png" alt="CUL Logo" className="w-16 h-16 object-contain" />
               <span>Change Ur Life</span>
             </div>
             <p className="text-neutral-400 max-w-xs text-sm leading-relaxed">
@@ -50,7 +48,7 @@ export function LandingFooter() {
 
         <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
           <p className="text-neutral-600 text-xs font-medium uppercase tracking-widest">
-            © 2026 Change Ur Life AI. Built for the future of content.
+            © 2026 Change Ur Life. Built for the future of content.
           </p>
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-2">

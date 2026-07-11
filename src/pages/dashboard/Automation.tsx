@@ -306,7 +306,7 @@ export function Automation() {
         <div>
           <h1 className="text-3xl font-black text-white tracking-tighter flex items-center gap-3">
             <Zap className="w-8 h-8 text-indigo-500" />
-            AutoMatrix Scheduler
+            CUL Scheduler
           </h1>
           <p className="text-neutral-500 text-sm font-bold uppercase tracking-widest mt-1">
             End-to-End Video Automation Engine

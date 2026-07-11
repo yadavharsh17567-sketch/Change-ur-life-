@@ -21,6 +21,7 @@ import { YouTubeAccount } from '../../types/youtube';
 export function YouTubeAccounts() {
   const [accounts, setAccounts] = useState<YouTubeAccount[]>([]);
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,30 +164,39 @@ export function YouTubeAccounts() {
                          <RefreshCcw className="w-4 h-4" />
                        </Button>
                      )}
-                     <div className="relative group/menu">
+                   <div className="relative">
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           className="text-neutral-500 hover:text-white hover:bg-white/5"
+                          onClick={() => setMenuOpenId(menuOpenId === account.id ? null : account.id)}
                         >
                           <MoreVertical className="w-4 h-4" />
                         </Button>
-                        <div className="absolute right-0 top-full mt-2 w-48 py-2 bg-neutral-900 border border-white/5 rounded-2xl shadow-2xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-50">
-                          <button 
-                            onClick={() => handleRename(account.id)}
-                            className="w-full px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white hover:bg-white/5 flex items-center gap-3"
-                          >
-                            <Settings2 className="w-4 h-4" />
-                            Edit Nickname
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(account.id)}
-                            className="w-full px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 flex items-center gap-3 border-t border-white/5"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Disconnect
-                          </button>
-                        </div>
+                        {menuOpenId === account.id && (
+                          <div className="absolute right-0 top-full mt-2 w-48 py-2 bg-neutral-900 border border-white/5 rounded-2xl shadow-2xl z-50">
+                            <button 
+                              onClick={() => {
+                                handleRename(account.id);
+                                setMenuOpenId(null);
+                              }}
+                              className="w-full px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white hover:bg-white/5 flex items-center gap-3"
+                            >
+                              <Settings2 className="w-4 h-4" />
+                              Edit Nickname
+                            </button>
+                            <button 
+                              onClick={() => {
+                                handleDelete(account.id);
+                                setMenuOpenId(null);
+                              }}
+                              className="w-full px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 flex items-center gap-3 border-t border-white/5"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Disconnect
+                            </button>
+                          </div>
+                        )}
                      </div>
                   </div>
                 </div>

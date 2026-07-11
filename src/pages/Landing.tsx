@@ -18,9 +18,7 @@ export function Landing() {
       <nav className="fixed top-0 inset-x-0 h-20 border-b border-white/5 bg-neutral-950/70 backdrop-blur-xl z-50">
         <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
           <div className="flex items-center gap-3 font-black text-2xl tracking-tighter text-white">
-            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-indigo-600 shadow-lg shadow-indigo-500/20">
-              <span className="text-white font-black text-lg">AI</span>
-            </div>
+            <img src="/logo.png" alt="CUL Logo" className="w-20 h-20 object-contain" />
             <span className="hidden sm:block">Change Ur Life</span>
           </div>
           

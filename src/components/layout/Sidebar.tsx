@@ -40,9 +40,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       )}>
         <div className="h-20 flex shrink-0 items-center justify-between px-6 border-b border-white/5">
           <Link to="/" className="flex items-center gap-3 font-black text-2xl tracking-tighter text-white" onClick={onClose}>
-            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-indigo-600 shadow-lg shadow-indigo-500/20">
-              <span className="text-white font-black text-lg">AI</span>
-            </div>
+            <img src="/logo.png" alt="CUL Logo" className="w-16 h-16 object-contain" />
             <span className="hidden lg:block md:hidden xl:block">CUL AI</span>
           </Link>
           <Button variant="ghost" size="icon" className="md:hidden -mr-2" onClick={onClose}>
