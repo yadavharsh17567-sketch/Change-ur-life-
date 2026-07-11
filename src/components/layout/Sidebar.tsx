@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Settings, User, Folder, UploadCloud, LogOut, Sparkles, Video, Scissors, X } from 'lucide-react';
+import { Home, Settings, User, Folder, UploadCloud, LogOut, Sparkles, Video, Scissors, X, Activity, Youtube, Zap } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
 
@@ -13,8 +13,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const links = [
     { icon: Home, label: 'Dashboard', path: '/app' },
-    { icon: Video, label: 'Video Editor', path: '/app/editor' },
+    { icon: Zap, label: 'Automation', path: '/app/automation' },
     { icon: Scissors, label: 'Auto Clipper', path: '/app/clipper' },
+    { icon: Activity, label: 'Pipeline', path: '/app/pipeline' },
+    { icon: Youtube, label: 'YT Accounts', path: '/app/youtube-accounts' },
+    { icon: Video, label: 'Video Editor', path: '/app/editor' },
     { icon: Folder, label: 'Projects', path: '/app/projects' },
     { icon: UploadCloud, label: 'Uploads', path: '/app/uploads' },
     { icon: User, label: 'Profile', path: '/app/profile' },
@@ -32,30 +35,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       )}
       
       <div className={cn(
-        "w-64 h-[100dvh] border-r border-white/5 bg-neutral-950 flex flex-col fixed md:sticky top-0 z-50 transition-transform duration-200 ease-in-out",
+        "w-64 h-[100dvh] border-r border-white/5 bg-neutral-950/70 backdrop-blur-2xl flex flex-col fixed md:sticky top-0 z-50 transition-all duration-300 ease-in-out",
         isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}>
-        <div className="h-16 flex shrink-0 items-center justify-between px-6 border-b border-white/5">
-          <Link to="/" className="flex items-center gap-3 font-bold text-lg tracking-tight" onClick={onClose}>
-            <div className="w-8 h-8 rounded overflow-hidden flex items-center justify-center bg-white/5">
-              <img 
-                src="/logo.png" 
-                alt="CUL Logo" 
-                className="w-full h-full object-cover" 
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.parentElement!.innerHTML = '<span class="text-indigo-500 font-bold">CUL</span>';
-                }}
-              />
+        <div className="h-20 flex shrink-0 items-center justify-between px-6 border-b border-white/5">
+          <Link to="/" className="flex items-center gap-3 font-black text-2xl tracking-tighter text-white" onClick={onClose}>
+            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-indigo-600 shadow-lg shadow-indigo-500/20">
+              <span className="text-white font-black text-lg">AI</span>
             </div>
-            <span className="hidden lg:block md:hidden xl:block">Change Ur Life</span>
+            <span className="hidden lg:block md:hidden xl:block">CUL AI</span>
           </Link>
           <Button variant="ghost" size="icon" className="md:hidden -mr-2" onClick={onClose}>
             <X className="w-5 h-5 text-neutral-400" />
           </Button>
         </div>
         
-        <div className="flex-1 py-6 px-4 flex flex-col gap-1 overflow-y-auto">
+        <div className="flex-1 py-8 px-4 flex flex-col gap-1.5 overflow-y-auto">
           {links.map((link) => {
             const isActive = location.pathname === link.path;
             return (
@@ -64,14 +59,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 to={link.path}
                 onClick={onClose}
                 className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold uppercase tracking-widest transition-all duration-300 relative group",
                 isActive 
-                  ? "bg-indigo-500/10 text-indigo-400" 
-                  : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50"
+                  ? "bg-indigo-600/10 text-white border border-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.1)]" 
+                  : "text-neutral-500 hover:text-white hover:bg-white/5"
               )}
             >
-              <link.icon className="w-4 h-4" />
+              <link.icon className={cn(
+                "w-4 h-4 transition-colors",
+                isActive ? "text-indigo-400" : "text-neutral-500 group-hover:text-white"
+              )} />
               {link.label}
+              {isActive && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-indigo-500 rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
+              )}
             </Link>
           );
         })}
@@ -80,7 +81,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div className="p-4 border-t border-white/5">
         <Link
           to="/"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50 transition-colors"
+          className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold uppercase tracking-widest text-neutral-500 hover:text-white hover:bg-white/5 transition-all"
         >
           <LogOut className="w-4 h-4" />
           Log out

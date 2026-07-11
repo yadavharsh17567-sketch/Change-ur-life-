@@ -1,6 +1,6 @@
 {
-  "name": "Change Your Life",
-  "description": "A premium AI SaaS dashboard.",
+  "name": "AutoMatrix AI",
+  "description": "Full-stack video automation system with remote downloader, AI SEO optimization, and scheduled YouTube multi-channel uploads.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

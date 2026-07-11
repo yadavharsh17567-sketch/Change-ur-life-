@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../../components/ui/Button';
 
 export function Settings() {
@@ -9,20 +9,35 @@ export function Settings() {
   const [isSaving, setIsSaving] = useState(false);
   
   const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [automationGeminiApiKey, setAutomationGeminiApiKey] = useState('');
   const [ytdlCookies, setYtdlCookies] = useState('');
   const [groqApiKey, setGroqApiKey] = useState('');
+  const [openaiApiKey, setOpenaiApiKey] = useState('');
+  const [deepgramApiKey, setDeepgramApiKey] = useState('');
+  const [assemblyAiApiKey, setAssemblyAiApiKey] = useState('');
+  const [aiProvider, setAiProvider] = useState('groq');
+  const [captionStyle, setCaptionStyle] = useState('mrbeast');
+  const [emojiEnabled, setEmojiEnabled] = useState(false);
   const [aiSubtitlesEnabled, setAiSubtitlesEnabled] = useState(false);
   const [subtitleLanguage, setSubtitleLanguage] = useState('auto');
   const [isSavingGlobal, setIsSavingGlobal] = useState(false);
   const [isTestingGroq, setIsTestingGroq] = useState(false);
+  const [isTestingProvider, setIsTestingProvider] = useState(false);
 
   useEffect(() => {
     fetch('/api/settings/global')
       .then(res => res.json())
       .then(data => {
         setGeminiApiKey(data.geminiApiKey || '');
+        setAutomationGeminiApiKey(data.automationGeminiApiKey || '');
         setYtdlCookies(data.ytdlCookies || '');
         setGroqApiKey(data.groqApiKey || '');
+        setOpenaiApiKey(data.openaiApiKey || '');
+        setDeepgramApiKey(data.deepgramApiKey || '');
+        setAssemblyAiApiKey(data.assemblyAiApiKey || '');
+        setAiProvider(data.aiProvider || 'groq');
+        setCaptionStyle(data.captionStyle || 'mrbeast');
+        setEmojiEnabled(data.emojiEnabled || false);
         setAiSubtitlesEnabled(data.aiSubtitlesEnabled || false);
         setSubtitleLanguage(data.subtitleLanguage || 'auto');
       })
@@ -45,7 +60,12 @@ export function Settings() {
       await fetch('/api/settings/global', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ geminiApiKey, ytdlCookies, groqApiKey, aiSubtitlesEnabled, subtitleLanguage }),
+        body: JSON.stringify({ 
+          geminiApiKey, automationGeminiApiKey, ytdlCookies, groqApiKey, 
+          openaiApiKey, deepgramApiKey, assemblyAiApiKey, 
+          aiProvider, captionStyle, emojiEnabled, 
+          aiSubtitlesEnabled, subtitleLanguage 
+        }),
       });
       alert('Global settings saved successfully!');
     } catch (error) {
@@ -55,27 +75,45 @@ export function Settings() {
     }
   };
 
-  const handleTestGroq = async () => {
-    if (!groqApiKey) {
-      alert('Please enter a Groq API Key first.');
+  const handleTestProvider = async () => {
+    let keyToTest = '';
+    let testUrl = '';
+    let headers: any = {};
+    
+    if (aiProvider === 'groq') {
+      keyToTest = groqApiKey;
+      testUrl = 'https://api.groq.com/openai/v1/models';
+      headers = { 'Authorization': `Bearer ${keyToTest}` };
+    } else if (aiProvider === 'openai') {
+      keyToTest = openaiApiKey;
+      testUrl = 'https://api.openai.com/v1/models';
+      headers = { 'Authorization': `Bearer ${keyToTest}` };
+    } else if (aiProvider === 'deepgram') {
+      keyToTest = deepgramApiKey;
+      testUrl = 'https://api.deepgram.com/v1/projects';
+      headers = { 'Authorization': `Token ${keyToTest}` };
+    } else if (aiProvider === 'assemblyai') {
+      keyToTest = assemblyAiApiKey;
+      testUrl = 'https://api.assemblyai.com/v2/transcript';
+      headers = { 'Authorization': keyToTest };
+    }
+
+    if (!keyToTest) {
+      alert(`Please enter a valid API Key for ${aiProvider}.`);
       return;
     }
-    setIsTestingGroq(true);
+    setIsTestingProvider(true);
     try {
-      const res = await fetch('https://api.groq.com/openai/v1/models', {
-        headers: {
-          'Authorization': `Bearer ${groqApiKey}`,
-        }
-      });
-      if (res.ok) {
-        alert('Groq API Key is valid!');
+      const res = await fetch(testUrl, { headers });
+      if (res.ok || res.status === 405) { // 405 might happen on AssemblyAI GET instead of POST, but auth succeeded
+        alert(`${aiProvider.toUpperCase()} API Key is valid!`);
       } else {
-        alert('Invalid Groq API Key or network error.');
+        alert(`Invalid API Key or network error for ${aiProvider}.`);
       }
     } catch (err) {
       alert('Error testing API key.');
     } finally {
-      setIsTestingGroq(false);
+      setIsTestingProvider(false);
     }
   };
 
@@ -98,49 +136,53 @@ export function Settings() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
+    <div className="max-w-4xl mx-auto space-y-12 pb-12">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-neutral-400 text-sm mt-1">Manage your account preferences.</p>
+        <h1 className="text-4xl font-black text-white tracking-tighter">System Configuration</h1>
+        <p className="text-neutral-500 text-sm font-bold uppercase tracking-[0.2em] mt-2">
+          Global Parameters & Neural Integrations
+        </p>
       </div>
 
       {isMaster && (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="rounded-2xl border border-indigo-500/30 bg-neutral-900/50 overflow-hidden relative"
+          transition={{ duration: 0.5 }}
+          className="rounded-[2.5rem] border border-indigo-500/30 bg-neutral-900/40 backdrop-blur-2xl overflow-hidden relative shadow-2xl"
         >
-          <div className="absolute top-0 right-0 p-2 bg-indigo-500 text-white text-xs font-bold rounded-bl-lg">MASTER</div>
-          <div className="p-6 border-b border-white/5">
-            <h2 className="text-lg font-semibold text-indigo-400">Developer Settings</h2>
-            <p className="text-sm text-neutral-400 mt-1">Configure backend API credentials (Google OAuth).</p>
+          <div className="absolute top-0 right-0 px-6 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-bl-[1.5rem]">
+            Root Access
           </div>
-          <div className="p-6 space-y-4">
-            <div className="space-y-4">
+          <div className="p-10 border-b border-white/5 bg-indigo-500/5">
+            <h2 className="text-xl font-black text-white tracking-tight">Matrix Core Settings</h2>
+            <p className="text-sm text-neutral-500 font-medium mt-1">Initialize backend neural pathways (Google OAuth).</p>
+          </div>
+          <div className="p-10 space-y-8">
+            <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-neutral-300 mb-2">Google OAuth Client ID</label>
+                <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3">Google Matrix Client ID</label>
                 <input 
                   type="text" 
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
-                  className="w-full h-12 bg-neutral-950/50 border border-white/10 rounded-xl px-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm"
-                  placeholder="Paste Client ID here..."
+                  className="w-full h-14 bg-neutral-950/50 border border-white/5 rounded-2xl px-6 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm shadow-inner"
+                  placeholder="Paste Client ID..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-300 mb-2">Google OAuth Client Secret</label>
+                <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3">Google Matrix Client Secret</label>
                 <input 
                   type="password" 
                   value={clientSecret}
                   onChange={(e) => setClientSecret(e.target.value)}
-                  className="w-full h-12 bg-neutral-950/50 border border-white/10 rounded-xl px-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm"
-                  placeholder="Paste Client Secret here..."
+                  className="w-full h-14 bg-neutral-950/50 border border-white/5 rounded-2xl px-6 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm shadow-inner"
+                  placeholder="Paste Client Secret..."
                 />
               </div>
-              <div className="pt-2">
-                <Button onClick={handleSaveOauth} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  {isSaving ? 'Saving...' : 'Save Credentials'}
+              <div className="pt-4">
+                <Button onClick={handleSaveOauth} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-500/20 px-8">
+                  {isSaving ? 'Initializing...' : 'Save Core Credentials'}
                 </Button>
               </div>
             </div>
@@ -151,37 +193,47 @@ export function Settings() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="rounded-2xl border border-white/5 bg-neutral-900/50 overflow-hidden"
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="rounded-[2.5rem] border border-white/5 bg-neutral-900/40 backdrop-blur-2xl overflow-hidden shadow-2xl"
       >
-        <div className="p-6 border-b border-white/5">
-          <h2 className="text-lg font-semibold">API Integrations</h2>
-          <p className="text-sm text-neutral-400 mt-1">Configure external services like Gemini and YouTube downloader.</p>
+        <div className="p-10 border-b border-white/5 bg-white/5">
+          <h2 className="text-xl font-black text-white tracking-tight">External Neural Nodes</h2>
+          <p className="text-sm text-neutral-500 font-medium mt-1">Configure Gemini LLM and high-bandwidth video processors.</p>
         </div>
-        <div className="p-6 space-y-4">
-          <div className="space-y-4">
+        <div className="p-10 space-y-8">
+          <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">Gemini API Key</label>
+              <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3">Gemini API Access Token (Global)</label>
               <input 
                 type="password" 
                 value={geminiApiKey}
                 onChange={(e) => setGeminiApiKey(e.target.value)}
-                className="w-full h-12 bg-neutral-950/50 border border-white/10 rounded-xl px-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm"
-                placeholder="Paste Gemini API Key here..."
+                className="w-full h-14 bg-neutral-950/50 border border-white/5 rounded-2xl px-6 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm"
+                placeholder="Paste Gemini Token..."
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">Netscape HTTP Cookies (For ytdl-core)</label>
+              <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-3">Gemini API Access Token (Automation Only)</label>
+              <input 
+                type="password" 
+                value={automationGeminiApiKey}
+                onChange={(e) => setAutomationGeminiApiKey(e.target.value)}
+                className="w-full h-14 bg-neutral-950/50 border border-indigo-500/10 rounded-2xl px-6 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm"
+                placeholder="Paste separate Gemini Token for AutoMatrix..."
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3">Authentication Cookies (Netscape)</label>
               <textarea 
                 value={ytdlCookies}
                 onChange={(e) => setYtdlCookies(e.target.value)}
-                className="w-full h-32 bg-neutral-950/50 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm resize-y"
-                placeholder="Paste Netscape format cookies here..."
+                className="w-full h-40 bg-neutral-950/50 border border-white/5 rounded-2xl p-6 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm resize-y"
+                placeholder="Paste Netscape format cookies..."
               />
             </div>
-            <div className="pt-2">
-              <Button onClick={handleSaveGlobal} disabled={isSavingGlobal} className="bg-white hover:bg-neutral-200 text-black">
-                {isSavingGlobal ? 'Saving...' : 'Save Settings'}
+            <div className="pt-4">
+              <Button onClick={handleSaveGlobal} disabled={isSavingGlobal} className="bg-white hover:bg-neutral-200 text-black px-8">
+                {isSavingGlobal ? 'Saving...' : 'Sync Integration'}
               </Button>
             </div>
           </div>
@@ -191,111 +243,144 @@ export function Settings() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="rounded-2xl border border-white/5 bg-neutral-900/50 overflow-hidden"
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="rounded-[2.5rem] border border-white/5 bg-neutral-900/40 backdrop-blur-2xl overflow-hidden shadow-2xl"
       >
-        <div className="p-6 border-b border-white/5">
-          <h2 className="text-lg font-semibold">AI Subtitles</h2>
-          <p className="text-sm text-neutral-400 mt-1">Configure Groq API and subtitle generation settings.</p>
+        <div className="p-10 border-b border-white/5 bg-white/5">
+          <h2 className="text-xl font-black text-white tracking-tight">Audio Transcriptions</h2>
+          <p className="text-sm text-neutral-500 font-medium mt-1">Configure Whisper-class audio processors and typography.</p>
         </div>
-        <div className="p-6 space-y-6">
-          <div className="flex items-center justify-between">
+        <div className="p-10 space-y-10">
+          <div className="flex items-center justify-between p-6 rounded-[1.5rem] bg-indigo-600/5 border border-indigo-500/20">
             <div>
-              <p className="font-medium text-white">Enable AI Subtitles</p>
-              <p className="text-sm text-neutral-400">Automatically generate and burn animated subtitles after editing.</p>
+              <p className="font-black text-white tracking-tight uppercase text-xs">Neural Subtitles</p>
+              <p className="text-xs text-neutral-500 font-medium mt-1">Generate and render high-impact animated captions.</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" className="sr-only peer" checked={aiSubtitlesEnabled} onChange={(e) => setAiSubtitlesEnabled(e.target.checked)} />
-              <div className="w-11 h-6 bg-neutral-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              <div className="w-12 h-7 bg-neutral-800 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-800/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600 shadow-lg shadow-indigo-500/20"></div>
             </label>
           </div>
 
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">Groq API Key (Required for AI Subtitles)</label>
-              <input 
-                type="password" 
-                value={groqApiKey}
-                onChange={(e) => setGroqApiKey(e.target.value)}
-                className="w-full h-12 bg-neutral-950/50 border border-white/10 rounded-xl px-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm"
-                placeholder="Paste Groq API Key here..."
-              />
-              {!groqApiKey && (
-                <p className="text-xs text-orange-400 mt-2">Subtitle generation requires a valid Groq API key.</p>
-              )}
+              <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3">Neural Processor</label>
+              <select 
+                value={aiProvider} 
+                onChange={(e) => setAiProvider(e.target.value)}
+                className="w-full bg-neutral-950 border border-white/5 rounded-2xl px-6 h-14 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              >
+                <option value="groq">Groq Whisper (Fastest)</option>
+                <option value="openai">OpenAI Whisper</option>
+                <option value="deepgram">Deepgram Nova-2</option>
+                <option value="assemblyai">AssemblyAI Universal</option>
+              </select>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={handleTestGroq} disabled={isTestingGroq} variant="outline" className="border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10">
-                {isTestingGroq ? 'Testing...' : 'Test API Key'}
-              </Button>
-            </div>
+            
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={aiProvider}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+              >
+                <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3">
+                  {aiProvider.toUpperCase()} Matrix Key
+                </label>
+                <input 
+                  type="password" 
+                  value={
+                    aiProvider === 'groq' ? groqApiKey : 
+                    aiProvider === 'openai' ? openaiApiKey : 
+                    aiProvider === 'deepgram' ? deepgramApiKey : 
+                    assemblyAiApiKey
+                  }
+                  onChange={(e) => {
+                    if (aiProvider === 'groq') setGroqApiKey(e.target.value);
+                    else if (aiProvider === 'openai') setOpenaiApiKey(e.target.value);
+                    else if (aiProvider === 'deepgram') setDeepgramApiKey(e.target.value);
+                    else setAssemblyAiApiKey(e.target.value);
+                  }}
+                  className="w-full h-14 bg-neutral-950 border border-white/5 rounded-2xl px-6 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono text-sm"
+                  placeholder={`Paste ${aiProvider} API Key...`}
+                />
+              </motion.div>
+            </AnimatePresence>
           </div>
 
-          <div className="space-y-4 pt-4 border-t border-white/5">
-            <h3 className="text-sm font-medium text-white">Subtitle Style & Settings</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex gap-4">
+            <Button onClick={handleTestProvider} disabled={isTestingProvider} variant="outline" className="border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 h-14 px-8 rounded-2xl font-black text-[10px] uppercase tracking-widest">
+              {isTestingProvider ? 'Ping...' : 'Test Connection'}
+            </Button>
+          </div>
+
+          <div className="space-y-8 pt-10 border-t border-white/5">
+            <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Visual Matrix Configuration</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
               <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-2">Subtitle Language</label>
+                <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3">Sub-Language</label>
                 <select 
                   value={subtitleLanguage} 
                   onChange={(e) => setSubtitleLanguage(e.target.value)}
-                  className="w-full bg-neutral-950/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  className="w-full bg-neutral-950 border border-white/5 rounded-2xl px-6 h-14 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                 >
-                  <option value="auto">Auto Detect</option>
-                  <option value="en">English</option>
+                  <option value="auto">Auto-Detect Neural</option>
+                  <option value="en">English (US)</option>
+                  <option value="hi">Hindi</option>
                   <option value="es">Spanish</option>
                   <option value="fr">French</option>
-                  <option value="hi">Hindi</option>
+                  <option value="de">German</option>
+                  <option value="pt">Portuguese</option>
+                  <option value="ja">Japanese</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-2">Subtitle Position</label>
-                <select className="w-full bg-neutral-950/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
-                  <option>Center Bottom (Shorts Safe)</option>
-                  <option>Center Middle</option>
-                  <option>Center Top</option>
+                <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3">Typography Preset</label>
+                <select 
+                  value={captionStyle}
+                  onChange={(e) => setCaptionStyle(e.target.value)}
+                  className="w-full bg-neutral-950 border border-white/5 rounded-2xl px-6 h-14 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                >
+                  <option value="mrbeast">High Impact (MrBeast)</option>
+                  <option value="hormozi">Alex Hormozi V3</option>
+                  <option value="gaming">Twitch Gaming</option>
+                  <option value="podcast">Clean Editorial</option>
+                  <option value="minimal">Minimal HUD</option>
+                  <option value="custom">Manual Matrix</option>
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-2">Font Size</label>
-                <select className="w-full bg-neutral-950/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
-                  <option>Large (Recommended)</option>
-                  <option>Medium</option>
-                  <option>Small</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-2">Color Theme</label>
-                <select className="w-full bg-neutral-950/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
-                  <option>White & Yellow (Classic)</option>
-                  <option>White & Green</option>
-                  <option>White & Cyan</option>
-                </select>
-              </div>
-              <div className="sm:col-span-2 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-white text-sm">Word Highlighting & Animation</p>
-                  <p className="text-xs text-neutral-400">Pop and color words as they are spoken.</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" defaultChecked />
-                  <div className="w-11 h-6 bg-neutral-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                </label>
               </div>
             </div>
 
-            <div className="mt-4 p-4 rounded-xl border border-white/5 bg-black flex items-center justify-center relative overflow-hidden h-32 aspect-video mx-auto">
-                <div className="absolute inset-0 opacity-30 bg-gradient-to-t from-indigo-900/50 to-transparent pointer-events-none"></div>
-                <div className="text-center w-full z-10 px-4">
-                  <span className="text-2xl font-bold font-sans tracking-tight text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] [text-shadow:_-2px_-2px_0_#000,_2px_-2px_0_#000,_-2px_2px_0_#000,_2px_2px_0_#000]">
-                    This is how <span className="text-yellow-400">subtitles</span> will look!
+            {/* Preview Frame */}
+            <div className="relative p-10 rounded-[2.5rem] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden aspect-video shadow-inner">
+                <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop')] bg-cover bg-center pointer-events-none grayscale" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent pointer-events-none" />
+                
+                <motion.div 
+                  key={captionStyle + emojiEnabled}
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-center w-full z-10 px-8"
+                >
+                  <span className={`text-3xl font-black tracking-tighter text-white drop-shadow-[0_8px_8px_rgba(0,0,0,0.8)] ${
+                    captionStyle === 'mrbeast' ? 'font-sans uppercase [text-shadow:_-3px_-3px_0_#000,_3px_-3px_0_#000,_-3px_3px_0_#000,_3px_3px_0_#000]' : 
+                    captionStyle === 'hormozi' ? 'font-sans italic' : 
+                    captionStyle === 'gaming' ? 'font-mono text-emerald-400' :
+                    captionStyle === 'podcast' ? 'font-serif text-neutral-200' :
+                    'font-sans'
+                  }`}>
+                    Neural Matrix {emojiEnabled ? '⚡' : ''} <span className={
+                      captionStyle === 'gaming' ? 'text-white' : 
+                      captionStyle === 'podcast' ? 'text-indigo-400' : 
+                      'text-yellow-400'
+                    }>Initialized</span> successfully!
                   </span>
-                </div>
+                </motion.div>
             </div>
             
-            <div className="pt-4">
-              <Button onClick={handleSaveGlobal} disabled={isSavingGlobal} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                {isSavingGlobal ? 'Saving...' : 'Save AI Settings'}
+            <div className="pt-6">
+              <Button onClick={handleSaveGlobal} disabled={isSavingGlobal} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-500/20 px-10 h-14">
+                {isSavingGlobal ? 'Processing...' : 'Deploy Global Config'}
               </Button>
             </div>
           </div>
@@ -305,46 +390,21 @@ export function Settings() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="rounded-2xl border border-white/5 bg-neutral-900/50 overflow-hidden"
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="rounded-[2.5rem] border border-rose-900/20 bg-rose-500/5 backdrop-blur-2xl overflow-hidden shadow-2xl"
       >
-        <div className="p-6 border-b border-white/5">
-          <h2 className="text-lg font-semibold">Appearance</h2>
-          <p className="text-sm text-neutral-400 mt-1">Customize how the application looks on your device.</p>
+        <div className="p-10 border-b border-rose-900/20 bg-rose-500/5">
+          <h2 className="text-xl font-black text-rose-400 tracking-tight">Danger Zone</h2>
+          <p className="text-sm text-neutral-500 font-medium mt-1">Irreversible destructive operations.</p>
         </div>
-        <div className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="p-10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div>
-              <p className="font-medium">Theme</p>
-              <p className="text-sm text-neutral-400">Select your preferred color theme.</p>
+              <p className="font-black text-rose-400 uppercase text-xs">Terminate Account</p>
+              <p className="text-xs text-neutral-500 font-medium mt-1">Permanently purge your profile and all processed data streams.</p>
             </div>
-            <select className="bg-neutral-950 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
-              <option>Dark Mode</option>
-              <option>System</option>
-              <option>Light Mode</option>
-            </select>
-          </div>
-        </div>
-      </motion.div>
-
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1 }}
-        className="rounded-2xl border border-white/5 bg-neutral-900/50 overflow-hidden"
-      >
-        <div className="p-6 border-b border-white/5">
-          <h2 className="text-lg font-semibold">Danger Zone</h2>
-          <p className="text-sm text-neutral-400 mt-1">Irreversible actions for your account.</p>
-        </div>
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-red-400">Delete Account</p>
-              <p className="text-sm text-neutral-400">Permanently delete your account and all associated data.</p>
-            </div>
-            <Button variant="outline" className="border-red-900/50 text-red-400 hover:bg-red-950/50">
-              Delete Account
+            <Button variant="outline" className="border-rose-900/50 text-rose-400 hover:bg-rose-950/50 h-14 px-8 rounded-2xl font-black text-[10px] uppercase tracking-widest">
+              Delete Profile
             </Button>
           </div>
         </div>

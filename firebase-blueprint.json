@@ -1,0 +1,34 @@
+{
+  "entities": {
+    "scheduled_task": {
+      "title": "Scheduled Task",
+      "description": "A video upload task scheduled for a specific time.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the task" },
+        "videoUrl": { "type": "string", "description": "The URL of the video to download" },
+        "title": { "type": "string", "description": "Video title" },
+        "description": { "type": "string", "description": "Video description" },
+        "tags": { "type": "array", "description": "List of tags for the video" },
+        "scheduledTime": { "type": "string", "format": "date-time", "description": "ISO timestamp of when to upload" },
+        "status": { 
+          "type": "string", 
+          "enum": ["pending", "processing", "downloading", "uploading", "completed", "failed"],
+          "description": "Current status of the task"
+        },
+        "youtubeAccountId": { "type": "string", "description": "ID of the YouTube account to upload to" },
+        "videoId": { "type": "string", "description": "YouTube Video ID after successful upload" },
+        "error": { "type": "string", "description": "Error message if failed" },
+        "userId": { "type": "string", "description": "UID of the user who created the task" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the task was created" }
+      },
+      "required": ["videoUrl", "title", "scheduledTime", "status", "userId"]
+    }
+  },
+  "firestore": {
+    "/scheduled_tasks/{taskId}": {
+      "schema": "scheduled_task",
+      "description": "User scheduled video automation tasks"
+    }
+  }
+}

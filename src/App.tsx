@@ -9,8 +9,11 @@ import { Settings } from './pages/dashboard/Settings';
 import { Profile } from './pages/dashboard/Profile';
 import { VideoEditor } from './pages/dashboard/VideoEditor';
 import { AutoClipper } from './pages/dashboard/AutoClipper';
+import { Pipeline } from './pages/dashboard/Pipeline';
+import { YouTubeAccounts } from './pages/dashboard/YouTubeAccounts';
 import { Projects } from './pages/dashboard/Projects';
 import { Uploads } from './pages/dashboard/Uploads';
+import { Automation } from './pages/dashboard/Automation';
 
 export default function App() {
   return (
@@ -26,6 +29,9 @@ export default function App() {
         {/* Dashboard Routes */}
         <Route path="/app" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="automation" element={<Automation />} />
+          <Route path="pipeline" element={<Pipeline />} />
+          <Route path="youtube-accounts" element={<YouTubeAccounts />} />
           <Route path="editor" element={<VideoEditor />} />
           <Route path="clipper" element={<AutoClipper />} />
           <Route path="projects" element={<Projects />} />
