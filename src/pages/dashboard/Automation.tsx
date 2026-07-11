@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar, 
@@ -44,6 +44,9 @@ export function Automation() {
   const [isSeoLoading, setIsSeoLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
 
+  const tasksRef = useRef<ScheduledTask[]>([]);
+  tasksRef.current = tasks;
+
   // Form state for Task
   const [videoUrl, setVideoUrl] = useState('');
   const [title, setTitle] = useState('');
@@ -74,9 +77,10 @@ export function Automation() {
       const res = await fetch('/api/automation/tasks');
       const data = await res.json();
       if (Array.isArray(data)) {
-        if (showNotifications && tasks.length > 0) {
+        const currentTasks = tasksRef.current;
+        if (showNotifications && currentTasks.length > 0) {
           data.forEach((task: any) => {
-            const oldTask = tasks.find(ot => ot.id === task.id);
+            const oldTask = currentTasks.find(ot => ot.id === task.id);
             if (oldTask && oldTask.status !== task.status) {
               if (task.status === 'completed') {
                 showToast(`Video uploaded successfully: ${task.title}`, 'success');
@@ -141,7 +145,7 @@ export function Automation() {
       mounted = false;
       clearInterval(intervalId);
     };
-  }, [tasks]);
+  }, []);
 
   const handleSchedule = async (e: React.FormEvent) => {
     e.preventDefault();

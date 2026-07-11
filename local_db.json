@@ -1,0 +1,42 @@
+{
+  "projects": [
+    {
+      "id": "1",
+      "title": "SEO Guide 2026",
+      "createdAt": {
+        "_seconds": 1783773773.437
+      },
+      "status": "Completed",
+      "duration": "10:45",
+      "fileUrl": ""
+    },
+    {
+      "id": "2",
+      "title": "Untitled_Video_01",
+      "createdAt": {
+        "_seconds": 1783687373.437
+      },
+      "status": "Draft",
+      "duration": "02:15",
+      "fileUrl": ""
+    },
+    {
+      "id": "3",
+      "title": "My Vlog Ep 5",
+      "createdAt": {
+        "_seconds": 1783514573.437
+      },
+      "status": "Exported",
+      "duration": "15:20",
+      "fileUrl": ""
+    }
+  ],
+  "uploads": [],
+  "scheduled_tasks": [],
+  "automation_rules": [],
+  "settings": {
+    "global": {
+      "geminiApiKey": ""
+    }
+  }
+}

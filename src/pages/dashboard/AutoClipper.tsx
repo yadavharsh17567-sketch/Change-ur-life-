@@ -3,15 +3,8 @@ import { motion } from 'motion/react';
 import { Scissors, Youtube, Link as LinkIcon, Sparkles, Clock, TrendingUp, CheckCircle, Upload, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { cn } from '../../lib/utils';
+import { Clip } from '../../types/pipeline';
 
-interface Clip {
-  title: string;
-  description: string;
-  tags: string[];
-  startTime: string;
-  endTime: string;
-  viralScore: number;
-}
 
 export function AutoClipper() {
   const [url, setUrl] = useState('');
@@ -22,6 +15,12 @@ export function AutoClipper() {
   const [uploadingClips, setUploadingClips] = useState<{ [key: number]: boolean | string }>({});
   const [uploadedClips, setUploadedClips] = useState<{ [key: number]: boolean }>({});
   const [ytStatus, setYtStatus] = useState<{connected: boolean} | null>(null);
+  const [apiError, setApiError] = useState<{
+    stage: string;
+    error: string;
+    solution: string;
+    details?: string;
+  } | null>(null);
 
   useEffect(() => {
     fetch('/api/youtube/status')
@@ -37,7 +36,9 @@ export function AutoClipper() {
     setClips([]);
     setVideoInfo(null);
     setUploadedClips({});
+    setApiError(null);
     
+    let isErrorHandled = false;
     try {
       setStep('Fetching livestream data...');
       
@@ -48,7 +49,24 @@ export function AutoClipper() {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to process video');
+        let errPayload;
+        try {
+          errPayload = await response.json();
+        } catch {
+          throw new Error('Failed to parse system response.');
+        }
+        if (errPayload && errPayload.error) {
+          setApiError({
+            stage: errPayload.stage || 'Generator',
+            error: errPayload.error,
+            solution: errPayload.solution || 'Verify that the video is public and that your API keys are valid.',
+            details: errPayload.details
+          });
+          isErrorHandled = true;
+          throw new Error(errPayload.error);
+        } else {
+          throw new Error('An unknown pipeline error occurred.');
+        }
       }
 
       setStep('Analyzing content with AI...');
@@ -64,20 +82,31 @@ export function AutoClipper() {
         }, 1500);
       }, 1500);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       setIsProcessing(false);
       setStep('');
-      alert('Error processing video');
+      if (!isErrorHandled) {
+        setApiError({
+          stage: 'Input Link Extraction',
+          error: error.message || 'Error processing video link',
+          solution: 'Ensure the link is valid, public, and that you have configured your Gemini API Key.'
+        });
+      }
     }
   };
 
   const handleUploadClip = async (index: number, clip: Clip) => {
     if (!ytStatus?.connected) {
-      alert('Please connect your YouTube channel first.');
+      setApiError({
+        stage: 'Export',
+        error: 'YouTube Account Disconnected',
+        solution: 'Connect your YouTube channel in Settings first to authorize direct exports.'
+      });
       return;
     }
 
+    setApiError(null);
     setUploadingClips(prev => ({ ...prev, [index]: 'Extracting Audio...' }));
     
     const progressSteps = [
@@ -108,12 +137,32 @@ export function AutoClipper() {
       if (response.ok) {
         setUploadedClips(prev => ({ ...prev, [index]: true }));
       } else {
-        const errorData = await response.json();
-        alert('Upload failed: ' + errorData.error);
+        let errPayload;
+        try {
+          errPayload = await response.json();
+        } catch {
+          throw new Error('Failed to parse error response from system.');
+        }
+        if (errPayload && errPayload.error) {
+          setApiError({
+            stage: errPayload.stage || 'Export',
+            error: errPayload.error,
+            solution: errPayload.solution || 'Verify your YouTube link settings or upload quotas.',
+            details: errPayload.details
+          });
+        } else {
+          throw new Error('YouTube export failed due to an unknown system error.');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload failed', error);
-      alert('Failed to upload clip');
+      if (!apiError) {
+        setApiError({
+          stage: 'Export',
+          error: error.message || 'Failed to upload clip',
+          solution: 'Ensure that the video isn\'t private or age-restricted, and try again.'
+        });
+      }
     } finally {
       clearInterval(progressInterval);
       setUploadingClips(prev => ({ ...prev, [index]: false }));
@@ -154,6 +203,64 @@ export function AutoClipper() {
             <Youtube className="w-5 h-5 mr-3 group-hover:scale-110 transition-transform" />
             Initialize YouTube Link
           </Button>
+        </motion.div>
+      )}
+
+      {apiError && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-rose-500/5 backdrop-blur-xl border border-rose-500/20 rounded-[2.5rem] p-10 shadow-2xl shadow-rose-500/5 space-y-6 text-left"
+        >
+          <div className="flex items-start gap-6">
+            <div className="w-16 h-16 rounded-[1.5rem] bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shadow-inner flex-shrink-0">
+              <AlertCircle className="w-8 h-8 animate-pulse" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                <h3 className="text-xl font-black text-rose-500 tracking-tight uppercase">System Diagnostic Report</h3>
+                <span className="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full text-[9px] font-black tracking-widest uppercase flex-shrink-0 self-start">
+                  STAGE: {apiError.stage}
+                </span>
+              </div>
+              <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mt-1">
+                An exception occurred during pipeline execution
+              </p>
+              
+              <div className="mt-6 space-y-4 text-left">
+                <div className="bg-neutral-950/60 border border-white/5 rounded-2xl p-6">
+                  <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-2">Error Message</h4>
+                  <p className="text-white text-sm font-medium font-mono whitespace-pre-wrap">{apiError.error}</p>
+                </div>
+
+                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-6">
+                  <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-wider mb-2">Suggested Resolution</h4>
+                  <p className="text-emerald-300 text-sm font-medium leading-relaxed">{apiError.solution}</p>
+                </div>
+
+                {apiError.details && (
+                  <details className="group bg-neutral-950/40 border border-white/5 rounded-2xl p-6">
+                    <summary className="text-[10px] font-black text-neutral-500 uppercase tracking-wider cursor-pointer list-none flex items-center justify-between">
+                      <span>Show Technical Details (Stack Trace)</span>
+                      <span className="text-neutral-600 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <pre className="mt-4 text-xs font-mono text-neutral-400 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-60">
+                      {apiError.details}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setApiError(null)}
+              className="h-10 px-6 border-white/10 hover:bg-white/5 text-[9px] font-black uppercase tracking-[0.15em] rounded-xl"
+            >
+              Dismiss Report
+            </Button>
+          </div>
         </motion.div>
       )}
 

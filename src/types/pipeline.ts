@@ -29,3 +29,16 @@ export interface PipelineStats {
   successRate: number;
   totalRenderingTime: string;
 }
+
+export interface Clip {
+  id: string;
+  title: string;
+  description: string;
+  tags: string[];
+  startTime: string;
+  endTime: string;
+  duration: number;
+  viralScore: number;
+  transcript?: string;
+}
+

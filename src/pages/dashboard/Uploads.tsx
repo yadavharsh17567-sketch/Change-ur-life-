@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 export function Uploads() {
   const [uploads, setUploads] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -27,19 +28,31 @@ export function Uploads() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
     setIsUploading(true);
+    setError(null);
     
     const formData = new FormData();
     formData.append('file', e.target.files[0]);
 
     try {
-      await fetch('/api/uploads', {
+      const response = await fetch('/api/uploads', {
         method: 'POST',
         body: formData,
       });
+      
+      if (!response.ok) {
+        let errPayload;
+        try {
+          errPayload = await response.json();
+        } catch {
+          throw new Error('Upload failed. Please verify that your file type is valid and under 500MB.');
+        }
+        throw new Error(errPayload.error || 'Upload failed.');
+      }
+      
       fetchUploads();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Upload failed');
+      setError(err.message || 'Upload failed');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -94,6 +107,26 @@ export function Uploads() {
           {isUploading ? 'Uploading...' : 'Initialize Upload'}
         </Button>
       </div>
+
+      {error && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-6 rounded-[1.5rem] flex items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-sm">{error}</span>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setError(null)}
+            className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl font-black text-[10px] uppercase tracking-widest px-3 border-0"
+          >
+            Dismiss
+          </Button>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 space-y-4">
